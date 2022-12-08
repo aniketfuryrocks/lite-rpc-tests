@@ -5,8 +5,8 @@ use std::time::Duration;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::signature::Signature;
 use solana_sdk::{
-    message::Message, native_token::LAMPORTS_PER_SOL, pubkey::Pubkey, signature::Keypair,
-    signer::Signer, system_instruction, transaction::Transaction,
+    message::Message, pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction,
+    transaction::Transaction,
 };
 use tokio::time::sleep;
 
@@ -36,8 +36,7 @@ pub async fn create_transaction(funded_payer: &Keypair, rpc_client: &RpcClient) 
     let to_pubkey = Pubkey::new_unique();
 
     // transfer instruction
-    let instruction =
-        system_instruction::transfer(&funded_payer.pubkey(), &to_pubkey, 1_000_000);
+    let instruction = system_instruction::transfer(&funded_payer.pubkey(), &to_pubkey, 1_000_000);
 
     let message = Message::new(&[instruction], Some(&funded_payer.pubkey()));
 
