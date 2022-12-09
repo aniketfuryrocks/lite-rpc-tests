@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::{AddAssign, DivAssign};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -11,7 +12,48 @@ use solana_sdk::native_token::LAMPORTS_PER_SOL;
 use lite_rpc_tests::client::{LiteClient, LOCAL_LIGHT_RPC_ADDR};
 use simplelog::*;
 
-const NUM_OF_TXS: usize = 60_000;
+const NUM_OF_TXS: usize = 10_000;
+const NUM_OF_RUNS: usize = 2;
+
+#[derive(Debug, Default)]
+struct Metric {
+    elapsed_sec: f64,
+    tps: f64,
+}
+
+#[derive(Default)]
+struct AvgMetric {
+    num_of_runs: usize,
+    total_metric: Metric,
+}
+
+impl AddAssign for Metric {
+    fn add_assign(&mut self, rhs: Self) {
+        self.elapsed_sec += rhs.elapsed_sec;
+        self.tps += rhs.tps;
+    }
+}
+
+impl DivAssign<f64> for Metric {
+    fn div_assign(&mut self, rhs: f64) {
+        self.elapsed_sec /= rhs;
+        self.tps /= rhs;
+    }
+}
+
+impl AddAssign<Metric> for AvgMetric {
+    fn add_assign(&mut self, rhs: Metric) {
+        self.num_of_runs += 1;
+        self.total_metric += rhs;
+    }
+}
+
+impl From<AvgMetric> for Metric {
+    fn from(mut avg_metric: AvgMetric) -> Self {
+        avg_metric.total_metric /= avg_metric.num_of_runs as f64;
+        avg_metric.total_metric
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -24,10 +66,19 @@ async fn main() {
     .unwrap();
 
     let lite_client = Arc::new(LiteClient(RpcClient::new(LOCAL_LIGHT_RPC_ADDR.to_string())));
-    foo(lite_client).await
+
+    let mut avg_metric = AvgMetric::default();
+
+    for run_num in 0..NUM_OF_RUNS {
+        let metric = foo(lite_client.clone()).await;
+        info!("Run {run_num}: Sent and Confirmed {NUM_OF_TXS} tx(s) in {metric:?}");
+        avg_metric += metric;
+    }
+
+    info!("Avg Metric {:?}", Metric::from(avg_metric));
 }
 
-async fn foo(lite_client: Arc<LiteClient>) {
+async fn foo(lite_client: Arc<LiteClient>) -> Metric {
     let funded_payer = new_funded_payer(&lite_client, LAMPORTS_PER_SOL * 2000)
         .await
         .unwrap();
@@ -85,5 +136,5 @@ async fn foo(lite_client: Arc<LiteClient>) {
     let elapsed_sec = start_time.elapsed().as_secs_f64();
     let tps = (NUM_OF_TXS as f64) / elapsed_sec;
 
-    info!("Sent and Confirmed {NUM_OF_TXS} tx(s) in {elapsed_sec} with TPS {tps}");
+    Metric { elapsed_sec, tps }
 }
