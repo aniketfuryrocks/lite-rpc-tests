@@ -1,8 +1,8 @@
-use std::collections::HashSet;
-use std::ops::{AddAssign, DivAssign};
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use lite_rpc_tests::metrics::{AvgMetric, Metric};
 use lite_rpc_tests::{generate_txs, new_funded_payer};
 use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -11,49 +11,10 @@ use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
 use lite_rpc_tests::client::{LiteClient, LOCAL_LIGHT_RPC_ADDR};
 use simplelog::*;
+use tokio::sync::mpsc;
 
 const NUM_OF_TXS: usize = 10_000;
-const NUM_OF_RUNS: usize = 2;
-
-#[derive(Debug, Default)]
-struct Metric {
-    elapsed_sec: f64,
-    tps: f64,
-}
-
-#[derive(Default)]
-struct AvgMetric {
-    num_of_runs: usize,
-    total_metric: Metric,
-}
-
-impl AddAssign for Metric {
-    fn add_assign(&mut self, rhs: Self) {
-        self.elapsed_sec += rhs.elapsed_sec;
-        self.tps += rhs.tps;
-    }
-}
-
-impl DivAssign<f64> for Metric {
-    fn div_assign(&mut self, rhs: f64) {
-        self.elapsed_sec /= rhs;
-        self.tps /= rhs;
-    }
-}
-
-impl AddAssign<Metric> for AvgMetric {
-    fn add_assign(&mut self, rhs: Metric) {
-        self.num_of_runs += 1;
-        self.total_metric += rhs;
-    }
-}
-
-impl From<AvgMetric> for Metric {
-    fn from(mut avg_metric: AvgMetric) -> Self {
-        avg_metric.total_metric /= avg_metric.num_of_runs as f64;
-        avg_metric.total_metric
-    }
-}
+const NUM_OF_RUNS: usize = 1;
 
 #[tokio::main]
 async fn main() {
@@ -71,11 +32,19 @@ async fn main() {
 
     for run_num in 0..NUM_OF_RUNS {
         let metric = foo(lite_client.clone()).await;
-        info!("Run {run_num}: Sent and Confirmed {NUM_OF_TXS} tx(s) in {metric:?}");
+        info!(
+            "Run {run_num}: Sent and Confirmed {NUM_OF_TXS} tx(s) in {metric:?} with tps {}",
+            metric.calc_tps()
+        );
         avg_metric += metric;
     }
 
-    info!("Avg Metric {:?}", Metric::from(avg_metric));
+    let avg_metric = Metric::from(avg_metric);
+
+    info!(
+        "Avg Metric {avg_metric:?} with tps {}",
+        avg_metric.calc_tps()
+    );
 }
 
 async fn foo(lite_client: Arc<LiteClient>) -> Metric {
@@ -87,9 +56,10 @@ async fn foo(lite_client: Arc<LiteClient>) -> Metric {
         .await
         .unwrap();
 
-    let mut un_confirmed_txs: HashSet<String> = HashSet::with_capacity(txs.len());
+    let mut un_confirmed_txs: HashMap<String, Option<Instant>> = HashMap::with_capacity(txs.len());
+
     for tx in &txs {
-        un_confirmed_txs.insert(tx.get_signature().to_string());
+        un_confirmed_txs.insert(tx.get_signature().to_string(), None);
     }
 
     let start_time = Instant::now();
@@ -107,34 +77,44 @@ async fn foo(lite_client: Arc<LiteClient>) -> Metric {
         })
     };
 
-    let confirm_fut = tokio::spawn(async move {
-        while !un_confirmed_txs.is_empty() {
-            let mut confirmed_txs = Vec::new();
+    let (metrics_send, mut metrics_recv) = mpsc::channel(1);
 
-            for sig in &un_confirmed_txs {
+    let confirm_fut = tokio::spawn(async move {
+        let mut metrics = Metric::default();
+
+        while !un_confirmed_txs.is_empty() {
+            let mut to_remove_txs = Vec::new();
+
+            for (sig, time_elapsed_since_last_confirmed) in un_confirmed_txs.iter_mut() {
+                if time_elapsed_since_last_confirmed.is_none() {
+                    *time_elapsed_since_last_confirmed = Some(Instant::now())
+                }
+
                 if lite_client.confirm_transaction(sig.clone()).await {
-                    confirmed_txs.push(sig.clone());
-                    info!("Confirmed {sig}");
+                    metrics.txs_confirmed += 1;
+                    to_remove_txs.push(sig.clone());
+                } else if time_elapsed_since_last_confirmed.unwrap().elapsed()
+                    > Duration::from_secs(2)
+                {
+                    metrics.txs_un_confirmed += 1;
+                    to_remove_txs.push(sig.clone());
                 }
             }
 
-            for tx in confirmed_txs {
-                un_confirmed_txs.remove(&tx);
+            for to_remove_tx in to_remove_txs {
+                un_confirmed_txs.remove(&to_remove_tx);
             }
-
-            info!(
-                "Confirmed {} tx(s) out of {NUM_OF_TXS}",
-                NUM_OF_TXS - un_confirmed_txs.len()
-            );
         }
+
+        metrics.time_elapsed = start_time.elapsed();
+        metrics.txs_sent = NUM_OF_TXS as u64;
+
+        metrics_send.send(metrics).await.unwrap();
     });
 
     let (res1, res2) = tokio::join!(send_fut, confirm_fut);
     res1.unwrap();
     res2.unwrap();
 
-    let elapsed_sec = start_time.elapsed().as_secs_f64();
-    let tps = (NUM_OF_TXS as f64) / elapsed_sec;
-
-    Metric { elapsed_sec, tps }
+    metrics_recv.recv().await.unwrap()
 }

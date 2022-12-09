@@ -1,4 +1,5 @@
 pub mod client;
+pub mod metrics;
 
 use std::thread;
 use std::time::Duration;
