@@ -5,9 +5,11 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use anyhow::bail;
 use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
+use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::hash::Hash;
 use solana_sdk::signature::Signature;
 use solana_sdk::{
@@ -27,7 +29,7 @@ pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> anyhow::
 
     info!("Air Dropping {payer_pubkey} with {amount}L");
 
-    thread::sleep(Duration::from_secs(12));
+   thread::sleep(Duration::from_secs(20));
 
     //loop {
     //    if let Some(res) = lite_client

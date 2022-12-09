@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_request::RpcRequest;
 
-pub const LOCAL_LIGHT_RPC_ADDR: &str = "http://127.0.0.1:8890";
+pub const LOCAL_LIGHT_RPC_ADDR: &str = "http://127.0.0.1:8899";
 
 pub struct LiteClient(pub RpcClient);
 
