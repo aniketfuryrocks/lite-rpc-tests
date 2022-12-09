@@ -17,7 +17,7 @@ pub struct AvgMetric {
 
 impl Metric {
     pub fn calc_tps(&self) -> f64 {
-        todo!()
+        self.txs_confirmed as f64 / self.time_elapsed.as_secs_f64()
     }
 }
 
