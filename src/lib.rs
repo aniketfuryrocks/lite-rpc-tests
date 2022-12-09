@@ -1,5 +1,8 @@
 pub mod client;
 
+use std::thread;
+use std::time::Duration;
+
 use anyhow::bail;
 use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -23,17 +26,19 @@ pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> anyhow::
 
     info!("Air Dropping {payer_pubkey} with {amount}L");
 
-    loop {
-        if let Some(res) = lite_client
-            .get_signature_status_with_commitment(&airdrop_sig, CommitmentConfig::finalized())
-            .await?
-        {
-            match res {
-                Ok(_) => break,
-                Err(_) => bail!("Error air dropping {payer_pubkey}"),
-            }
-        }
-    }
+    thread::sleep(Duration::from_secs(12));
+
+    //loop {
+    //    if let Some(res) = lite_client
+    //        .get_signature_status_with_commitment(&airdrop_sig, CommitmentConfig::finalized())
+    //        .await?
+    //    {
+    //        match res {
+    //            Ok(_) => break,
+    //            Err(_) => bail!("Error air dropping {payer_pubkey}"),
+    //        }
+    //    }
+    //}
 
     info!("Air Drop Successful: {airdrop_sig}");
 
