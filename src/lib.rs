@@ -1,5 +1,7 @@
 pub mod client;
+pub mod metrics;
 
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -12,6 +14,7 @@ use solana_sdk::{
     message::Message, pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction,
     transaction::Transaction,
 };
+use tokio::time::Instant;
 
 use self::client::LiteClient;
 
@@ -72,4 +75,32 @@ pub async fn generate_txs(
     }
 
     Ok(txs)
+}
+
+pub struct LatestBlockHash {
+    lite_client: Arc<LiteClient>,
+    blockhash: Hash,
+    ttl: Duration,
+    last_fetch_stamp: Instant,
+}
+
+impl LatestBlockHash {
+    pub async fn new(lite_client: Arc<LiteClient>, ttl: Duration) -> anyhow::Result<Self> {
+        Ok(Self {
+            blockhash: lite_client.get_latest_blockhash().await?,
+            lite_client,
+            ttl,
+            last_fetch_stamp: Instant::now(),
+        })
+    }
+
+    pub async fn get_latest_blockhash(&mut self) -> anyhow::Result<&Hash> {
+        if self.last_fetch_stamp.elapsed() > self.ttl {
+            let blockhash = self.lite_client.get_latest_blockhash().await?;
+            self.blockhash = blockhash;
+            self.last_fetch_stamp = Instant::now();
+        }
+
+        Ok(&self.blockhash)
+    }
 }
