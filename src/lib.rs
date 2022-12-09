@@ -1,5 +1,7 @@
 pub mod client;
 
+use anyhow::bail;
+use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -12,25 +14,30 @@ use solana_sdk::{
 
 use self::client::LiteClient;
 
-pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> Keypair {
+pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> anyhow::Result<Keypair> {
     let payer = Keypair::new();
+    let payer_pubkey = payer.pubkey().to_string();
 
     // request airdrop to payer
-    let airdrop_sig = lite_client
-        .request_airdrop(&payer.pubkey(), amount)
-        .await
-        .unwrap();
+    let airdrop_sig = lite_client.request_airdrop(&payer.pubkey(), amount).await?;
 
-    println!("{airdrop_sig}");
+    info!("Air Dropping {payer_pubkey} with {amount}L");
 
-    while lite_client
-        .get_signature_status_with_commitment(&airdrop_sig, CommitmentConfig::finalized())
-        .await
-        .unwrap()
-        .is_none()
-    {}
+    loop {
+        if let Some(res) = lite_client
+            .get_signature_status_with_commitment(&airdrop_sig, CommitmentConfig::finalized())
+            .await?
+        {
+            match res {
+                Ok(_) => break,
+                Err(_) => bail!("Error air dropping {payer_pubkey}"),
+            }
+        }
+    }
 
-    payer
+    info!("Air Drop Successful: {airdrop_sig}");
+
+    Ok(payer)
 }
 
 pub async fn wait_till_confirmed(lite_client: &LiteClient, sig: &Signature) {
@@ -52,14 +59,14 @@ pub async fn generate_txs(
     num_of_txs: usize,
     rpc_client: &RpcClient,
     funded_payer: &Keypair,
-) -> Vec<Transaction> {
+) -> anyhow::Result<Vec<Transaction>> {
     let mut txs = Vec::with_capacity(num_of_txs);
 
-    let blockhash = rpc_client.get_latest_blockhash().await.unwrap();
+    let blockhash = rpc_client.get_latest_blockhash().await?;
 
     for _ in 0..num_of_txs {
         txs.push(create_transaction(funded_payer, blockhash));
     }
 
-    txs
+    Ok(txs)
 }
