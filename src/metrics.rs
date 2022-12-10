@@ -1,12 +1,12 @@
 use std::ops::{AddAssign, DivAssign};
-use std::time::Duration;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize)]
 pub struct Metric {
-    pub time_elapsed: Duration,
+    pub time_elapsed_sec: f64,
     pub txs_sent: u64,
     pub txs_confirmed: u64,
     pub txs_un_confirmed: u64,
+    pub tps: f64,
 }
 
 #[derive(Default)]
@@ -16,31 +16,33 @@ pub struct AvgMetric {
 }
 
 impl Metric {
-    pub fn calc_tps(&self) -> f64 {
-        self.txs_confirmed as f64 / self.time_elapsed.as_secs_f64()
+    pub fn calc_tps(&mut self) {
+        self.tps = self.txs_confirmed as f64 / self.time_elapsed_sec
     }
 }
 
-impl AddAssign for Metric {
-    fn add_assign(&mut self, rhs: Self) {
-        self.time_elapsed += rhs.time_elapsed;
+impl AddAssign<&Self> for Metric {
+    fn add_assign(&mut self, rhs: &Self) {
+        self.time_elapsed_sec += rhs.time_elapsed_sec;
         self.txs_sent += rhs.txs_sent;
         self.txs_confirmed += rhs.txs_confirmed;
         self.txs_un_confirmed += rhs.txs_un_confirmed;
+        self.tps += rhs.tps
     }
 }
 
 impl DivAssign<u64> for Metric {
     fn div_assign(&mut self, rhs: u64) {
-        self.time_elapsed = Duration::from_nanos(self.time_elapsed.as_nanos() as u64 / rhs);
+        self.time_elapsed_sec /= rhs as f64;
         self.txs_sent /= rhs;
         self.txs_confirmed /= rhs;
         self.txs_un_confirmed /= rhs;
+        self.tps /= rhs as f64;
     }
 }
 
-impl AddAssign<Metric> for AvgMetric {
-    fn add_assign(&mut self, rhs: Metric) {
+impl AddAssign<&Metric> for AvgMetric {
+    fn add_assign(&mut self, rhs: &Metric) {
         self.num_of_runs += 1;
         self.total_metric += rhs;
     }

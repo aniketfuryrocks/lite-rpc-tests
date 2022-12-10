@@ -27,24 +27,23 @@ async fn main() {
     .unwrap();
 
     let lite_client = Arc::new(LiteClient(RpcClient::new(LOCAL_LIGHT_RPC_ADDR.to_string())));
+    let mut csv_writer = csv::Writer::from_path("metrics.csv").unwrap();
 
     let mut avg_metric = AvgMetric::default();
 
     for run_num in 0..NUM_OF_RUNS {
         let metric = foo(lite_client.clone()).await;
-        info!(
-            "Run {run_num}: Sent and Confirmed {NUM_OF_TXS} tx(s) in {metric:?} with tps {}",
-            metric.calc_tps()
-        );
-        avg_metric += metric;
+        info!("Run {run_num}: Sent and Confirmed {NUM_OF_TXS} tx(s) in {metric:?}",);
+        avg_metric += &metric;
+        csv_writer.serialize(metric).unwrap();
     }
 
     let avg_metric = Metric::from(avg_metric);
 
-    info!(
-        "Avg Metric {avg_metric:?} with tps {}",
-        avg_metric.calc_tps()
-    );
+    info!("Avg Metric {avg_metric:?}",);
+    csv_writer.serialize(avg_metric).unwrap();
+
+    csv_writer.flush().unwrap();
 }
 
 async fn foo(lite_client: Arc<LiteClient>) -> Metric {
@@ -106,8 +105,9 @@ async fn foo(lite_client: Arc<LiteClient>) -> Metric {
             }
         }
 
-        metrics.time_elapsed = start_time.elapsed();
+        metrics.time_elapsed_sec = start_time.elapsed().as_secs_f64();
         metrics.txs_sent = NUM_OF_TXS as u64;
+        metrics.calc_tps();
 
         metrics_send.send(metrics).await.unwrap();
     });

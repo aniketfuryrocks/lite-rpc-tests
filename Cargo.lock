@@ -1611,6 +1611,7 @@ dependencies = [
  "anyhow",
  "csv",
  "log",
+ "serde",
  "serde_json",
  "simplelog",
  "solana-client",
