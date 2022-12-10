@@ -15,6 +15,7 @@ use tokio::sync::mpsc;
 
 const NUM_OF_TXS: usize = 10_000;
 const NUM_OF_RUNS: usize = 1;
+const CSV_FILE_NAME: &str = "metrics.csv";
 
 #[tokio::main]
 async fn main() {
@@ -27,7 +28,7 @@ async fn main() {
     .unwrap();
 
     let lite_client = Arc::new(LiteClient(RpcClient::new(LOCAL_LIGHT_RPC_ADDR.to_string())));
-    let mut csv_writer = csv::Writer::from_path("metrics.csv").unwrap();
+    let mut csv_writer = csv::Writer::from_path(CSV_FILE_NAME).unwrap();
 
     let mut avg_metric = AvgMetric::default();
 
