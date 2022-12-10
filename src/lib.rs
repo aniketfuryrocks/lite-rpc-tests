@@ -1,9 +1,9 @@
-pub mod client;
 pub mod metrics;
 
 use std::thread;
 use std::time::Duration;
 
+use lite_client::LiteClient;
 use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 
@@ -13,8 +13,6 @@ use solana_sdk::{
     message::Message, pubkey::Pubkey, signature::Keypair, signer::Signer, system_instruction,
     transaction::Transaction,
 };
-
-use self::client::LiteClient;
 
 pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> anyhow::Result<Keypair> {
     let payer = Keypair::new();

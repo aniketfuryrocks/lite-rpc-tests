@@ -2,14 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use lite_rpc_tests::metrics::{AvgMetric, Metric};
-use lite_rpc_tests::{generate_txs, new_funded_payer};
+use lite_rpc_bench::metrics::{AvgMetric, Metric};
+use lite_rpc_bench::{generate_txs, new_funded_payer};
 use log::info;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_client::SerializableTransaction;
 use solana_sdk::native_token::LAMPORTS_PER_SOL;
 
-use lite_rpc_tests::client::{LiteClient, LOCAL_LIGHT_RPC_ADDR};
+use lite_client::{LiteClient, LOCAL_LIGHT_RPC_ADDR};
 use simplelog::*;
 use tokio::sync::mpsc;
 
