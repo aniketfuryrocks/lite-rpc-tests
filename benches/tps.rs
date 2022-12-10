@@ -90,11 +90,11 @@ async fn foo(lite_client: Arc<LiteClient>) -> Metric {
                     *time_elapsed_since_last_confirmed = Some(Instant::now())
                 }
 
-                if lite_client.confirm_transaction(sig.clone()).await {
+                if lite_client.confirm_transaction(sig.clone()).await.value {
                     metrics.txs_confirmed += 1;
                     to_remove_txs.push(sig.clone());
                 } else if time_elapsed_since_last_confirmed.unwrap().elapsed()
-                    > Duration::from_secs(2)
+                    > Duration::from_secs(3)
                 {
                     metrics.txs_un_confirmed += 1;
                     to_remove_txs.push(sig.clone());
