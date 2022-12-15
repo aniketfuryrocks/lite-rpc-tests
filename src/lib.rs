@@ -43,7 +43,7 @@ pub async fn new_funded_payer(lite_client: &LiteClient, amount: u64) -> anyhow::
 }
 
 pub async fn wait_till_confirmed(lite_client: &LiteClient, sig: &Signature) {
-    while lite_client.confirm_transaction(sig.to_string()).await.value {}
+    while lite_client.confirm_transaction(sig.to_string()).await {}
 }
 
 pub fn create_transaction(funded_payer: &Keypair, blockhash: Hash) -> Transaction {
